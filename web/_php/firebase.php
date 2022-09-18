@@ -3,7 +3,7 @@ require __DIR__.'/vendor/autoload.php';
 
 use Kreait\Firebase\Factory;
 
-$factory = (new Factory)->withServiceAccount('/opt/sennatempmonitor/firebase_credentials.json');
+$factory = (new Factory)->withServiceAccount('/opt/weather-monitor/firebase_credentials.json');
 
 $database = $factory->createDatabase();
 
