@@ -1,19 +1,11 @@
 #include <FirebaseESP32.h>        // https://github.com/mobizt/Firebase-ESP32
-#include <WiFi.h>
+#include <WiFiManager.h>          // https://github.com/tzapu/WiFiManager
 #include <DHT.h>                  // adafruit's DHT libraty
 #include "time.h"
-#include "BluetoothSerial.h"
-#include "Preferences.h"
 
-#define SSID_ADDR 0
-#define PSWD_ADDR 32
-
-#define EEPROM_SIZE 64            // accepting a string of up to 64 characters as ssid and password
-#define EEPROM_FIELD_SIZE 32            // accepting a string of up to 64 characters as ssid and password
-
-#define FIREBASE_HOST "https://example-default-rtdb.firebaseio.com"
+#define FIREBASE_HOST "https://<your project>.firebaseio.com/"
 #define FIREBASE_API_KEY "<your API key>"
-#define FIREBASE_DB "<your database>"
+#define FIREBASE_DB "<database alias>"
 
 #define DHTPIN 15
 #define DHTTYPE DHT22
@@ -22,109 +14,35 @@
 #define GMT_OFFSET_SEC -10800     // GMT offset in seconds (GMT-3 in my case, Sao Paulo timezone)
 #define DAYLIGHT_OFFSET_SEC 0     // daylight saving offset if applicable
 
-#define INTERVAL 1200000          // interval between reading temperature and humidity [in miliseconds] 20 minutes in my case
+#define INTERVAL 1200000          // interval between reading temperature and humidity [in miliseconds]
 
 FirebaseData fbData;
-
-BluetoothSerial SerialBT;
-
-Preferences preferences;
-
-char ssid[32] = "";
-char pswd[32] = "";
 
 uint32_t lastTimeRead = 0;
 
 DHT dht(DHTPIN, DHTTYPE);
 
-void loadWiFi(){
-  // retrieving credentials
-  preferences.getString("ssid", "").toCharArray(ssid, EEPROM_FIELD_SIZE);
-  preferences.getString("pswd", "").toCharArray(pswd, EEPROM_FIELD_SIZE);
+void setupWiFi(){
+  WiFiManager wm;
+  bool res = false;
 
-  Serial.println("read ssid=" + String(ssid) + " password=" + String(pswd));
-}
-
-void getWiFiCredentials(){
-  char value, i = 0;
-
-  SerialBT.begin("weather-monitor");
-
-  while(!SerialBT.available()){
-    SerialBT.println("send the SSID (MAX LENGTH = 64)");
-    delay(500);
-  }
-
-  value = SerialBT.read();
-  while(value != '\n' && i < EEPROM_FIELD_SIZE){
-    ssid[i] = value;
-    value = SerialBT.read();
-    i += 1;
-  }
-  ssid[strlen(ssid) - 1] =  '\0';
-
-  Serial.println(ssid);
-
-  while(!SerialBT.available()){
-    SerialBT.println("send the password (MAX LENGTH = 64)");
-    delay(500);
-  }
-
-  i = 0;
-  value = SerialBT.read();
-  while(value != '\n' && i < EEPROM_FIELD_SIZE){
-    pswd[i] = value;
-    value = SerialBT.read();
-    i += 1;
-  }
-  pswd[strlen(pswd) - 1] =  '\0';
-
-  Serial.println(pswd);
-  
-  preferences.putString("ssid", ssid); 
-  preferences.putString("pswd", pswd);
-
-  SerialBT.disconnect();
-  SerialBT.end();
-
-}
-
-bool setupWiFi(){
-  // waits 15 seconds for a connection (30 * 500ms)
-  char timeout = 30;
-
-  Serial.println("connecting to ssid=" + String(ssid) + " password=" + String(pswd));
-
-  // disconnects and sets as wifi station ()
-  WiFi.disconnect();
+  // sets as wifi station
   WiFi.mode(WIFI_STA);
-
-  // trying to connect
-  Serial.println("connecting to wifi");
-  WiFi.begin(ssid, pswd);
-
-  while(WiFi.status() != WL_CONNECTED){
-    delay(500);
-    Serial.print(".");
-    timeout--;
-    if(timeout == 0){
-      return false;
-    }
-  }
   
+  while(!res){
+    // trying to connect
+    Serial.println("connecting to wifi");
+    res = wm.autoConnect("weather-monitor");
+  }
+
   Serial.println("");
   Serial.print("connected with ip ");
   Serial.println(WiFi.localIP());
-  return true;
 }
 
 void stopWiFi(){
   WiFi.disconnect();
   delay(500);
-}
-
-void setupTime(){
-  configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
 }
 
 void setupFirebase(){
@@ -139,73 +57,80 @@ void stopFirebase(){
 }
 
 String dhtReadTemperature(){
-  float q = 0, t = 0, s = 0;
+  float samples = 0, sum = 0, sensor = 0;
 
-  Serial.print("temp ");
+  Serial.println("temperature");
   
-  for(int i = 0;i < 3;i++){
+  // tries to read 3 samples and calculates the average temperature
+  for(char i = 0;i < 3;i++){
     // collect sample
-    s = dht.readTemperature();
-    Serial.print(String(i) + "=");
-    Serial.print(String(s) + " ");
+    sensor = dht.readTemperature();
 
-    // verify if valid sample
-    if(!isnan(s)){
-      if(s > -20 && s < 70){
-        t += s;
-        q += 1.0;
+    // verify if its a valid sample
+    if(!isnan(sensor)){
+      if(sensor > -20 && sensor < 70){
+        Serial.println(String(i) + "=" + String(sensor));
+        sum += sensor;
+        samples += 1.0;
       }
     }
     delay(10000);
   }
-  Serial.println();
 
   // no success reading
-  if(q == 0){
+  if(samples == 0){
+    Serial.println("falied reading temperature");
     return "--";
   }
   
-  return String(t / q);
+  return String(sum / samples);
 }
 
 String dhtReadHumidity(){
-  float q = 0, h = 0, s = 0;
+  float samples = 0, sum = 0, sensor = 0;
 
-  Serial.print("hum ");
+  Serial.println("humidity");
   
+  // tries to read 3 samples and calculates the average humidity
   for(int i = 0;i < 3;i++){
     // collect sample
-    s = dht.readHumidity();
-    Serial.print(String(i) + "=");
-    Serial.print(String(s) + " ");
+    sensor = dht.readHumidity();
 
     // verify if valid sample
-    if(!isnan(s)){
-      if(s >= 0 && s <= 100){
-        h += s;
-        q += 1.0;
+    if(!isnan(sensor)){
+      if(sensor >= 0 && sensor <= 100){
+        Serial.println(String(i) + "=" + String(sensor));
+        sum += sensor;
+        samples += 1.0;
       }
     }
     delay(10000);
   }
-  Serial.println();
 
   // no success reading
-  if(q == 0){
+  if(samples == 0){
+    Serial.println("falied reading humidity");
     return "--";
   }
   
-  return String(h / q);
+  return String(sum / samples);
 }
 
 void pushData(String temperature, String humidity){
   struct tm timeInfo;
+
+  // restarts the unit if it loses wifi connection
+  if(!WiFi.isConnected()){
+    ESP.restart();
+  }
   
+  // get local time
   if(!getLocalTime(&timeInfo)){
-    Serial.println("Failed to obtain time");
+    Serial.println("failed to obtain time");
     return;
   }
 
+  // get current year, month and day
   char year[5];
   strftime(year, 5, "%Y", &timeInfo);
   char month[3];
@@ -233,28 +158,14 @@ void pushData(String temperature, String humidity){
 void setup() {
   Serial.begin(115200);
 
-  // starting Preferences
-  preferences.begin("wifi", false); 
-
   // starts DHT22
   dht.begin();
 
-  // load WiFi credentials from EEPROM
-  loadWiFi();
-
   // starts WiFi client
-  while(!setupWiFi()){
-    // receives new wifi credentials via bluetooth
-    Serial.println("");
-    Serial.println("failed connecting to wifi, enabling bluetooth");
-    getWiFiCredentials();
-  }
-
-  // Preferences not needed anymore
-  preferences.end();
+  setupWiFi();
 
   // setup NTP client
-  setupTime();
+  configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
   
   setupFirebase();
 }
@@ -279,7 +190,7 @@ void loop() {
     // stop Firebase
     //stopFirebase();
     
-    // close wifi
+    // close wifi [not using since im not worried with power consumption]
     //stopWiFi();
     
     lastTimeRead = now;
