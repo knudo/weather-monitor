@@ -2,13 +2,18 @@
 #include <WiFi.h>
 #include <DHT.h>                  // adafruit's DHT libraty
 #include "time.h"
+#include "BluetoothSerial.h"
+#include "Preferences.h"
 
-#define WIFISSID "ssid"
-#define WIFIPWD "password"
+#define SSID_ADDR 0
+#define PSWD_ADDR 32
 
-#define FIREBASE_HOST "host"
-#define FIREBASE_API_KEY "api key"
-#define FIREBASE_DB "/path/"
+#define EEPROM_SIZE 64            // accepting a string of up to 64 characters as ssid and password
+#define EEPROM_FIELD_SIZE 32            // accepting a string of up to 64 characters as ssid and password
+
+#define FIREBASE_HOST "https://example-default-rtdb.firebaseio.com"
+#define FIREBASE_API_KEY "<your API key>"
+#define FIREBASE_DB "<your database>"
 
 #define DHTPIN 15
 #define DHTTYPE DHT22
@@ -21,25 +26,96 @@
 
 FirebaseData fbData;
 
+BluetoothSerial SerialBT;
+
+Preferences preferences;
+
+char ssid[32] = "";
+char pswd[32] = "";
+
 uint32_t lastTimeRead = 0;
 
 DHT dht(DHTPIN, DHTTYPE);
 
-void setupWiFi(){
+void loadWiFi(){
+  // retrieving credentials
+  preferences.getString("ssid", "").toCharArray(ssid, EEPROM_FIELD_SIZE);
+  preferences.getString("pswd", "").toCharArray(pswd, EEPROM_FIELD_SIZE);
+
+  Serial.println("read ssid=" + String(ssid) + " password=" + String(pswd));
+}
+
+void getWiFiCredentials(){
+  char value, i = 0;
+
+  SerialBT.begin("weather-monitor");
+
+  while(!SerialBT.available()){
+    SerialBT.println("send the SSID (MAX LENGTH = 64)");
+    delay(500);
+  }
+
+  value = SerialBT.read();
+  while(value != '\n' && i < EEPROM_FIELD_SIZE){
+    ssid[i] = value;
+    value = SerialBT.read();
+    i += 1;
+  }
+  ssid[strlen(ssid) - 1] =  '\0';
+
+  Serial.println(ssid);
+
+  while(!SerialBT.available()){
+    SerialBT.println("send the password (MAX LENGTH = 64)");
+    delay(500);
+  }
+
+  i = 0;
+  value = SerialBT.read();
+  while(value != '\n' && i < EEPROM_FIELD_SIZE){
+    pswd[i] = value;
+    value = SerialBT.read();
+    i += 1;
+  }
+  pswd[strlen(pswd) - 1] =  '\0';
+
+  Serial.println(pswd);
+  
+  preferences.putString("ssid", ssid); 
+  preferences.putString("pswd", pswd);
+
+  SerialBT.disconnect();
+  SerialBT.end();
+
+}
+
+bool setupWiFi(){
+  // waits 15 seconds for a connection (30 * 500ms)
+  char timeout = 30;
+
+  Serial.println("connecting to ssid=" + String(ssid) + " password=" + String(pswd));
+
+  // disconnects and sets as wifi station ()
   WiFi.disconnect();
   WiFi.mode(WIFI_STA);
 
+  // trying to connect
   Serial.println("connecting to wifi");
-  WiFi.begin(WIFISSID, WIFIPWD);
+  WiFi.begin(ssid, pswd);
 
   while(WiFi.status() != WL_CONNECTED){
     delay(500);
     Serial.print(".");
+    timeout--;
+    if(timeout == 0){
+      return false;
+    }
   }
-
+  
   Serial.println("");
   Serial.print("connected with ip ");
   Serial.println(WiFi.localIP());
+  return true;
 }
 
 void stopWiFi(){
@@ -155,15 +231,29 @@ void pushData(String temperature, String humidity){
 }
 
 void setup() {
-  Serial.begin(115200); 
+  Serial.begin(115200);
+
+  // starting Preferences
+  preferences.begin("wifi", false); 
 
   // starts DHT22
   dht.begin();
 
-  // starts WiFi client
-  setupWiFi();
+  // load WiFi credentials from EEPROM
+  loadWiFi();
 
-  // sets NTP client
+  // starts WiFi client
+  while(!setupWiFi()){
+    // receives new wifi credentials via bluetooth
+    Serial.println("");
+    Serial.println("failed connecting to wifi, enabling bluetooth");
+    getWiFiCredentials();
+  }
+
+  // Preferences not needed anymore
+  preferences.end();
+
+  // setup NTP client
   setupTime();
   
   setupFirebase();
@@ -177,7 +267,6 @@ void loop() {
     // read temperature and humidity
     String temp = dhtReadTemperature();
     String hum = dhtReadHumidity();
-  
     
     Serial.print("t: ");
     Serial.print(temp);
@@ -188,10 +277,10 @@ void loop() {
     pushData(temp, hum);
 
     // stop Firebase
-    stopFirebase();
+    //stopFirebase();
     
     // close wifi
-    stopWiFi();
+    //stopWiFi();
     
     lastTimeRead = now;
   }
