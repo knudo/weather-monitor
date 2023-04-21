@@ -3,9 +3,9 @@
 #include <DHT.h>                  // adafruit's DHT libraty
 #include "time.h"
 
-#define FIREBASE_HOST "https://<your project>.firebaseio.com/"
+#define FIREBASE_HOST "https://<your project>-default-rtdb.firebaseio.com/"
 #define FIREBASE_API_KEY "<your API key>"
-#define FIREBASE_DB "<database alias>"
+#define FIREBASE_DB "<your database alias>"
 
 #define DHTPIN 15
 #define DHTTYPE DHT22
@@ -118,37 +118,25 @@ String dhtReadHumidity(){
 
 void pushData(String temperature, String humidity){
   struct tm timeInfo;
+  time_t timestamp;
 
   // restarts the unit if it loses wifi connection
   if(!WiFi.isConnected()){
     ESP.restart();
   }
-  
-  // get local time
+
   if(!getLocalTime(&timeInfo)){
-    Serial.println("failed to obtain time");
+    Serial.println("failed to get time");
     return;
   }
 
-  // get current year, month and day
-  char year[5];
-  strftime(year, 5, "%Y", &timeInfo);
-  char month[3];
-  strftime(month, 3, "%m", &timeInfo);
-  char day[3];
-  strftime(day, 3, "%d", &timeInfo);
+  time(&timestamp);
   
   FirebaseJson json;
-  FirebaseJson jsonTimestamp;
-  
-  jsonTimestamp.set(".sv", "timestamp");
   json.set("t", temperature);
   json.set("h", humidity);
-  json.set("d", jsonTimestamp);
 
-  String path = FIREBASE_DB + String(year) + "/" + String(month) + "/" + String(day) + "/";
-
-  if(Firebase.pushJSON(fbData, path, json)){
+  if(Firebase.setJSON(fbData, (FIREBASE_DB + String(timestamp)), json)){
     Serial.println("firebase success");
   }else{
     Serial.println(fbData.errorReason());
@@ -164,7 +152,7 @@ void setup() {
   // starts WiFi client
   setupWiFi();
 
-  // setup NTP client
+  // sets NTP client
   configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
   
   setupFirebase();
@@ -179,10 +167,7 @@ void loop() {
     String temp = dhtReadTemperature();
     String hum = dhtReadHumidity();
     
-    Serial.print("t: ");
-    Serial.print(temp);
-    Serial.print(" h: ");
-    Serial.println(hum);
+    Serial.println("t=" + temp + " h=" + hum);
     
     // send to firebase
     pushData(temp, hum);
@@ -195,5 +180,4 @@ void loop() {
     
     lastTimeRead = now;
   }
-  
 }
