@@ -99,7 +99,7 @@ function plot(title){
     var chartData = [["hora", "temperatura"]];
 
     measurings.forEach((item) => {
-        if((item[0] * 1000) >= start_date.getTime()){
+        if((item[0] * 1000) >= (start_date.getTime() - 1800)){
             let chartHour = new Date(item[0] * 1000);
             
             let hour = ((measurings.length < 76) ? timeFormat(chartHour) : dateFormat(chartHour) + ' ' + timeFormat(chartHour));
