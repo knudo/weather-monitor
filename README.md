@@ -15,6 +15,7 @@ Where `h` stants for humidity and `t` for temperature.
 Firebase will store it in an array of JSON objects.
 
 The front-end part of the project will just retrieve the data from Firebase and display it to the viewer. You can see a graphic with the last measurements, varying intervals for the current day, the last 24h, last week and last month.
+You can view the working project (the front-end part) [here](https://weather.knu.do).
 
 ## Images
 Main module with a 5V power supply (a phone charger) and the Esp32-WROOM-32 board in a water/dust tight enclousure.<br>
