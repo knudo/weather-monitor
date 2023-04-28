@@ -3,9 +3,9 @@
 #include <DHT.h>                  // adafruit's DHT libraty
 #include "time.h"
 
-#define FIREBASE_HOST "https://<your project>-default-rtdb.firebaseio.com/"
-#define FIREBASE_API_KEY "<your API key>"
-#define FIREBASE_DB "<your database alias>"
+#define FIREBASE_HOST "https://sennatempmonitor-default-rtdb.firebaseio.com/"
+#define FIREBASE_API_KEY "tJi3G0Jq1hfxIVQrTa3JzHQEOMBw4op2u5BOO2Xh"
+#define FIREBASE_DB "esp32/"
 
 #define DHTPIN 15
 #define DHTTYPE DHT22
