@@ -2,10 +2,7 @@
 #include <WiFiManager.h>          // https://github.com/tzapu/WiFiManager
 #include <DHT.h>                  // adafruit's DHT libraty
 #include "time.h"
-
-#define FIREBASE_HOST "https://sennatempmonitor-default-rtdb.firebaseio.com/"
-#define FIREBASE_API_KEY "tJi3G0Jq1hfxIVQrTa3JzHQEOMBw4op2u5BOO2Xh"
-#define FIREBASE_DB "esp32/"
+#include "personal_config.h"
 
 #define DHTPIN 15
 #define DHTTYPE DHT22
@@ -25,6 +22,10 @@ DHT dht(DHTPIN, DHTTYPE);
 void setupWiFi(){
   WiFiManager wm;
   bool res = false;
+
+  // setting a timeout, if a connection isnt made and new wifi config isnt received
+  // within 300 seconds (5 minutes) the system will attempt to connect again
+  wm.setConfigPortalTimeout(300);
 
   // sets as wifi station
   WiFi.mode(WIFI_STA);

@@ -144,6 +144,7 @@ function plot(title){
             height: 400,
             chartArea: {width: '90%'},
             legend: {position: 'bottom'},
+            pointSize: 3,
             series: {
                 0: {targetAxisIndex: 0},
                 1: {targetAxisIndex: 1}
