@@ -2,7 +2,7 @@
 #include <WiFiManager.h>          // https://github.com/tzapu/WiFiManager
 #include <DHT.h>                  // adafruit's DHT libraty
 #include "time.h"
-#include "personal_config.h"
+#include "personal_config.h"      // set your Firebase credentials on this file
 
 #define DHTPIN 15
 #define DHTTYPE DHT22
