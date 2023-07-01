@@ -2,8 +2,7 @@
 A weather monitoring system based on ESP32 with DHT22 and Firebase
 
 ## How does it work
-Every from time to time (20 minutes in my case) the board will measure the local temperature and humidity. It will then send this data to a Firebase database along with a timestamp representing the moment the data has been gathered as a JSON object.
-Example JSON:
+Every 20 min the MCU will acquire the local temperature and humidity. It will then send this data to a Firebase database along with a timestamp representing the moment the data has been gathered as a JSON object in the following format:
 ```json
 "1682207859": {
   "h": "89.70",
